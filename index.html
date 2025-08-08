@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Beautiful Calculator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap');
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Roboto Mono', monospace;
+    margin: 0;
+    user-select: none;
+  }
+
+  .calculator {
+    background: #2c2f4a;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    width: 320px;
+    padding: 20px;
+    color: white;
+  }
+
+  .display {
+    background: #1b1d33;
+    border-radius: 10px;
+    text-align: right;
+    padding: 20px 15px;
+    font-size: 2.5rem;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+  }
+
+  .buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+  }
+
+  button {
+    background: #3a3f6e;
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1.4rem;
+    padding: 18px 0;
+    cursor: pointer;
+    box-shadow: 0 5px #2d3160;
+    transition: background 0.3s, box-shadow 0.1s;
+  }
+
+  button:active {
+    box-shadow: 0 2px #2d3160;
+    transform: translateY(3px);
+  }
+
+  button.operator {
+    background: #ff9500;
+    color: white;
+    box-shadow: 0 5px #b26c00;
+  }
+
+  button.operator:active {
+    box-shadow: 0 2px #b26c00;
+    transform: translateY(3px);
+  }
+
+  button.span-two {
+    grid-column: span 2;
+  }
+</style>
+</head>
+<body>
+  <div class="calculator" role="application" aria-label="Calculator">
+    <div id="display" class="display" aria-live="polite" aria-atomic="true">0</div>
+    <div class="buttons">
+      <button type="button" id="clear" aria-label="Clear">C</button>
+      <button type="button" id="backspace" aria-label="Backspace">⌫</button>
+      <button type="button" id="percent" aria-label="Percent">%</button>
+      <button type="button" class="operator" data-op="/" aria-label="Divide">÷</button>
+
+      <button type="button" data-num="7">7</button>
+      <button type="button" data-num="8">8</button>
+      <button type="button" data-num="9">9</button>
+      <button type="button" class="operator" data-op="*" aria-label="Multiply">×</button>
+
+      <button type="button" data-num="4">4</button>
+      <button type="button" data-num="5">5</button>
+      <button type="button" data-num="6">6</button>
+      <button type="button" class="operator" data-op="-" aria-label="Subtract">−</button>
+
+      <button type="button" data-num="1">1</button>
+      <button type="button" data-num="2">2</button>
+      <button type="button" data-num="3">3</button>
+      <button type="button" class="operator" data-op="+" aria-label="Add">+</button>
+
+      <button type="button" data-num="0" class="span-two">0</button>
+      <button type="button" data-num=".">.</button>
+      <button type="button" id="equals" class="operator" aria-label="Equals">=</button>
+    </div>
+  </div>
+
+<script>
+  (function() {
+    const display = document.getElementById('display');
+    const buttons = document.querySelectorAll('button');
+    let currentInput = '0';
+    let lastInput = '';
+    let resetNext = false;
+
+    function updateDisplay() {
+      display.textContent = currentInput;
+    }
+
+    function isOperator(char) {
+      return ['+', '-', '*', '/'].includes(char);
+    }
+
+    function appendNumber(num) {
+      if (resetNext) {
+        currentInput = '';
+        resetNext = false;
+      }
+
+      if (currentInput === '0' && num !== '.') {
+        currentInput = num;
+      } else if (num === '.') {
+        // Avoid multiple decimals in last number segment
+        // Find last number segment:
+        const parts = currentInput.split(/[\+\-\*\/]/);
+        if (!parts[parts.length - 1].includes('.')) {
+          currentInput += num;
+        }
+      } else {
+        currentInput += num;
+      }
+    }
+
+    function appendOperator(op) {
+      if (resetNext) {
+        resetNext = false;
+      }
+      if (currentInput === '') return;
+      const lastChar = currentInput.slice(-1);
+
+      if (isOperator(lastChar)) {
+        // Replace operator
+        currentInput = currentInput.slice(0, -1) + op;
+      } else {
+        currentInput += op;
+      }
+    }
+
+    function clearAll() {
+      currentInput = '0';
+      resetNext = false;
+    }
+
+    function backspace() {
+      if (resetNext) {
+        clearAll();
+        return;
+      }
+      if (currentInput.length === 1) {
+        currentInput = '0';
+      } else {
+        currentInput = currentInput.slice(0, -1);
+      }
+    }
+
+    function calculate() {
+      try {
+        // Prepare expression: replace ÷ and × if any, but we only use / and *
+        let expression = currentInput;
+
+        // Handle percent: convert % to division by 100
+        // But percent can appear multiple times or in various forms.
+        // Let's replace all number% to (number/100)
+        // Use regex to find numbers followed by %:
+        expression = expression.replace(/(\d+(\.\d+)?)%/g, '($1/100)');
+
+        // Prevent eval injection by allowing only numbers and operators
+        if (/[^0-9.+\-*/()%\s]/.test(expression)) {
+          throw new Error('Invalid characters');
+        }
+        // eslint-disable-next-line no-eval
+        let result = eval(expression);
+
+        if (result === Infinity || result === -Infinity) throw new Error('Division by zero');
+
+        if (typeof result === 'number') {
+          result = +result.toFixed(10); // Limit floating point length
+        }
+
+        currentInput = result.toString();
+        resetNext = true;
+      } catch {
+        currentInput = 'Error';
+        resetNext = true;
+      }
+    }
+
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        if (button.id === 'clear') {
+          clearAll();
+          updateDisplay();
+          return;
+        }
+        if (button.id === 'backspace') {
+          backspace();
+          updateDisplay();
+          return;
+        }
+        if (button.id === 'equals') {
+          calculate();
+          updateDisplay();
+          return;
+        }
+        if (button.id === 'percent') {
+          // Append % to the current input safely
+          // Only add % if last char is a number
+          const lastChar = currentInput.slice(-1);
+          if (/\d/.test(lastChar)) {
+            currentInput += '%';
+            updateDisplay();
+          }
+          return;
+        }
+        if (button.dataset.num) {
+          appendNumber(button.dataset.num);
+          updateDisplay();
+          return;
+        }
+        if (button.classList.contains('operator')) {
+          appendOperator(button.dataset.op);
+          updateDisplay();
+          return;
+        }
+      });
+    });
+
+    // Keyboard support
+    window.addEventListener('keydown', e => {
+      if ((e.key >= '0' && e.key <= '9') || e.key === '.') {
+        e.preventDefault();
+        appendNumber(e.key);
+        updateDisplay();
+        return;
+      }
+      if (['+', '-', '*', '/'].includes(e.key)) {
+        e.preventDefault();
+        appendOperator(e.key);
+        updateDisplay();
+        return;
+      }
+      if (e.key === 'Enter' || e.key === '=') {
+        e.preventDefault();
+        calculate();
+        updateDisplay();
+        return;
+      }
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        backspace();
+        updateDisplay();
+        return;
+      }
+      if (e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        clearAll();
+        updateDisplay();
+        return;
+      }
+      if (e.key === '%') {
+        e.preventDefault();
+        // Append percent as well
+        const lastChar = currentInput.slice(-1);
+        if (/\d/.test(lastChar)) {
+          currentInput += '%';
+          updateDisplay();
+        }
+      }
+    });
+  })();
+</script>
+</body>
+</html>
